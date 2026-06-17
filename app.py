@@ -1,144 +1,209 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 1. 페이지 설정
-st.set_page_config(page_title="Classic Board Games", layout="centered")
+st.set_page_config(page_title="Perfect Omok", layout="centered")
 
-st.title("🧱 완벽한 격자 보드게임방")
-st.write("오목판과 체스판의 격자 선이 사진처럼 정확하게 정렬되도록 특수 코딩된 버전입니다.")
+st.markdown("<h2 style='text-align: center; color: #2c3e50;'>🧱 진짜 격자선 위에 놓이는 오목방</h2>", unsafe_allow_html=True)
+st.write("---")
 
-# 2. 탭 메뉴를 사용해서 오목과 체스를 깔끔하게 분리
 tab1, tab2 = st.tabs(["⚫ 오목 (Omok)", "👑 체스 (Chess)"])
 
 with tab1:
-    st.subheader("🪵 나무 격자 오목판")
-    st.caption("칸을 터치하면 바둑돌이 놓입니다. (5목 완성 시 승리)")
+    st.subheader("🪵 교차점 착수 오목판")
+    st.caption("네모 칸 안이 아니라, 선과 선이 만나는 '교차점' 위에 돌이 올라갑니다!")
     
-    # HTML/CSS/JS 결합형 완벽 오목판 주입
     omok_html = """
-    <div class="board-frame">
-        <div id="omok-grid" class="omok-grid"></div>
+    <div class="main-container">
+        <h3 class="status-title" id="o-turn">차례: ⚫ 흑돌</h3>
+        <div class="board-wood-frame">
+            <div id="o-grid" class="omok-grid-system"></div>
+        </div>
+        <button class="reset-btn" onclick="resetOmok()">🔄 오목판 초기화</button>
     </div>
-    <h3 id="turn-txt" style="text-align:center; color:#333; margin-top:15px;">현재 차례: ⚫ 흑돌</h3>
 
     <style>
-    .board-frame {
-        background-color: #f1c40f;
-        padding: 12px;
+    .main-container { text-align: center; font-family: sans-serif; }
+    .status-title { color: #333; margin-bottom: 10px; font-size: 20px; }
+    
+    /* 실제 나무 바둑판 프레임 */
+    .board-wood-frame {
+        background-color: #e8c39e; /* 따뜻한 나무색 */
+        padding: 20px;
         border-radius: 8px;
         width: fit-content;
         margin: 0 auto;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+        border: 2px solid #b58863;
     }
-    .omok-grid {
+    
+    /* 10x10 교차점을 만들기 위한 그리드 시스템 */
+    .omok-grid-system {
         display: grid;
-        grid-template-columns: repeat(10, 40px);
-        grid-template-rows: repeat(10, 40px);
-        gap: 1px;
-        background-color: #4a3319; /* 명확한 격자 선 색상 */
-        border: 2px solid #4a3319;
+        grid-template-columns: repeat(10, 42px);
+        grid-template-rows: repeat(10, 42px);
+        position: relative;
     }
-    .omok-cell {
-        background-color: #e8c39e; /* 사진 속 따뜻한 바둑판 색상 */
+    
+    /* 선과 선이 만나는 교차점 칸 디자인 */
+    .omok-tile {
+        position: relative;
+        width: 42px;
+        height: 42px;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
     }
-    .stone {
-        width: 34px;
-        height: 34px;
-        border-radius: 50%;
-        box-shadow: 1px 2px 4px rgba(0,0,0,0.3);
+    
+    /* 십자가 격자선 그리기 (핵심 테크닉!) */
+    .omok-tile::before {
+        content: "";
+        position: absolute;
+        background-color: #4a3411; /* 선 색상 */
+        width: 100%;
+        height: 1px; /* 가로선 */
+        top: 50%;
+        left: 0;
+        z-index: 1;
     }
-    .black-stone { background: radial-gradient(circle at 30% 30%, #444, #111); }
-    .white-stone { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #aaa; }
+    .omok-tile::after {
+        content: "";
+        position: absolute;
+        background-color: #4a3411; /* 선 색상 */
+        width: 1px; /* 세로선 */
+        height: 100%;
+        top: 0;
+        left: 50%;
+        z-index: 1;
+    }
+    
+    /* 진짜 입체 바둑돌 (선 위로 올라오도록 z-index 설정) */
+    .stone { 
+        width: 36px; 
+        height: 36px; 
+        border-radius: 50%; 
+        position: relative;
+        z-index: 5; /* 선보다 위로 올라오게 함 */
+        box-shadow: 1px 2px 4px rgba(0,0,0,0.4); 
+    }
+    .b-stone { background: radial-gradient(circle at 30% 30%, #555, #111); }
+    .w-stone { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; }
+    
+    .reset-btn { margin-top: 15px; padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 5px; border: 1px solid #ccc; background: #fff; }
+    .reset-btn:hover { background: #f0f0f0; }
     </style>
 
     <script>
-    let turn = 1; // 1: 흑, 2: 백
-    const board = Array(10).fill(0).map(() => Array(10).fill(0));
-    const grid = document.getElementById('omok-grid');
-    const turnTxt = document.getElementById('turn-txt');
+    let oTurn = 1; 
+    let gameOver = false;
+    let oBoard = Array(10).fill(0).map(() => Array(10).fill(0));
+    const oGrid = document.getElementById('o-grid');
+    const oTxt = document.getElementById('o-turn');
 
-    for(let r=0; r<10; r++) {
-        for(let c=0; c<10; c++) {
-            const cell = document.createElement('div');
-            cell.className = 'omok-cell';
-            cell.onclick = () => {
-                if(board[r][c] === 0) {
-                    board[r][c] = turn;
-                    const stone = document.createElement('div');
-                    stone.className = 'stone ' + (turn === 1 ? 'black-stone' : 'white-stone');
-                    cell.appendChild(stone);
-                    
-                    turn = 3 - turn;
-                    turnTxt.innerText = "현재 차례: " + (turn === 1 ? "⚫ 흑돌" : "⚪ 백돌");
+    function checkWin(r, c, color) {
+        const dir = [[0,1], [1,0], [1,1], [1,-1]];
+        for(let [dr, dc] of dir) {
+            let count = 1;
+            let nr = r + dr, nc = c + dc;
+            while(nr>=0 && nr<10 && nc>=0 && nc<10 && oBoard[nr][nc] === color) { count++; nr+=dr; nc+=dc; }
+            nr = r - dr; nc = c - dc;
+            while(nr>=0 && nr<10 && nc>=0 && nc<10 && oBoard[nr][nc] === color) { count++; nr-=dr; nc-=dc; }
+            if(count >= 5) return true;
+        }
+        return false;
+    }
+
+    function buildBoard() {
+        oGrid.innerHTML = '';
+        for(let r=0; r<10; r++) {
+            for(let c=0; c<10; c++) {
+                const tile = document.createElement('div');
+                tile.className = 'omok-tile';
+                
+                if(oBoard[r][c] === 1) {
+                    const stn = document.createElement('div'); stn.className = 'stone b-stone'; tile.appendChild(stn);
+                } else if(oBoard[r][c] === 2) {
+                    const stn = document.createElement('div'); stn.className = 'stone w-stone'; tile.appendChild(stn);
                 }
-            };
-            grid.appendChild(cell);
+
+                tile.onclick = () => {
+                    if(oBoard[r][c] === 0 && !gameOver) {
+                        oBoard[r][c] = oTurn;
+                        if(checkWin(r, c, oTurn)) {
+                            buildBoard();
+                            oTxt.innerHTML = "🎉 " + (oTurn === 1 ? "흑돌(Black)" : "백돌(White)") + " 승리!!!";
+                            gameOver = true;
+                            return;
+                        }
+                        oTurn = 3 - oTurn;
+                        oTxt.innerText = "차례: " + (oTurn === 1 ? "⚫ 흑돌" : "⚪ 백돌");
+                        buildBoard();
+                    }
+                };
+                oGrid.appendChild(tile);
+            }
         }
     }
+
+    function resetOmok() {
+        oTurn = 1;
+        gameOver = false;
+        oBoard = Array(10).fill(0).map(() => Array(10).fill(0));
+        oTxt.innerText = "차례: ⚫ 흑돌";
+        buildBoard();
+    }
+
+    buildBoard();
     </script>
     """
-    components.html(omok_html, height=520)
+    components.html(omok_html, height=580)
 
 with tab2:
-    st.subheader("🏁 클래식 체크무늬 체스판")
-    st.caption("움직일 말을 누른 뒤, 이동할 칸을 연속해서 선택하세요.")
+    st.subheader("🏁 체스판 (클래식 체크무늬)")
+    st.caption("체스는 오목과 달리 칸(네모 상자) 안에 말을 배치하는 것이 정상 규칙입니다.")
     
-    # HTML/CSS/JS 결합형 완벽 체스판 주입
     chess_html = """
-    <div class="board-frame-chess">
-        <div id="chess-grid" class="chess-grid"></div>
+    <div class="main-container">
+        <h3 class="status-title" id="c-status">움직일 말을 선택하세요</h3>
+        <div class="chess-wood-frame">
+            <div id="c-grid" class="chess-grid-system"></div>
+        </div>
     </div>
-    <div id="status" style="text-align:center; font-weight:bold; margin-top:15px; color:#c0392b;"></div>
 
     <style>
-    .board-frame-chess {
+    .chess-wood-frame {
         background-color: #d4ac0d;
-        padding: 15px;
-        border-radius: 8px;
+        padding: 12px;
+        border-radius: 10px;
         width: fit-content;
         margin: 0 auto;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
     }
-    .chess-grid {
+    .chess-grid-system {
         display: grid;
-        grid-template-columns: repeat(8, 50px);
-        grid-template-rows: repeat(8, 50px);
-        border: 3px solid #3d2f21;
+        grid-template-columns: repeat(8, 52px);
+        grid-template-rows: repeat(8, 52px);
+        border: 2px solid #3d2f21;
     }
-    .chess-cell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        user-select: none;
-    }
-    /* 사진 속 정밀한 갈색/베이지 체크무늬 완벽 구현 */
-    .light { background-color: #f0d9b5; }
-    .dark { background-color: #b58863; }
-    .selected { background-color: #769656 !important; } /* 선택 시 초록색 하이라이트 */
-    
-    .piece-img {
-        width: 45px;
-        height: 45px;
-    }
+    .chess-tile { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .white-tile { background-color: #f0d9b5; }
+    .dark-tile { background-color: #b58863; }
+    .active-select { background-color: #769656 !important; }
+    .p-img { width: 46px; height: 46px; object-fit: contain; }
     </style>
 
     <script>
-    const imgBase = "https://upload.wikimedia.org/wikipedia/commons";
-    const imgs = {
-        'r': imgBase + "/a/a0/Chess_rdt45.svg", 'n': imgBase + "/e/ef/Chess_ndt45.svg",
-        'b': imgBase + "/9/9b/Chess_bdt45.svg", 'q': imgBase + "/4/47/Chess_qdt45.svg",
-        'k': imgBase + "/f/f0/Chess_kdt45.svg", 'p': imgBase + "/c/c7/Chess_pdt45.svg",
-        'R': imgBase + "/7/72/Chess_rlt45.svg", 'N': imgBase + "/7/70/Chess_nlt45.svg",
-        'B': imgBase + "/b/b1/Chess_blt45.svg", 'Q': imgBase + "/1/15/Chess_qlt45.svg",
-        'K': imgBase + "/4/42/Chess_klt45.svg", 'P': imgBase + "/4/45/Chess_plt45.svg"
+    const base = "https://upload.wikimedia.org/wikipedia/commons";
+    const cImgs = {
+        'r': base + "/a/a0/Chess_rdt45.svg", 'n': base + "/e/ef/Chess_ndt45.svg",
+        'b': base + "/9/9b/Chess_bdt45.svg", 'q': base + "/4/47/Chess_qdt45.svg",
+        'k': base + "/f/f0/Chess_kdt45.svg", 'p': base + "/c/c7/Chess_pdt45.svg",
+        'R': base + "/7/72/Chess_rlt45.svg", 'N': base + "/7/70/Chess_nlt45.svg",
+        'B': base + "/b/b1/Chess_blt45.svg", 'Q': base + "/1/15/Chess_qlt45.svg",
+        'K': base + "/4/42/Chess_klt45.svg", 'P': base + "/4/45/Chess_plt45.svg"
     };
 
-    let chessBoard = [
+    let cBoard = [
         ['r','n','b','q','k','b','n','r'],
         ['p','p','p','p','p','p','p','p'],
         ['','','','','','','',''],
@@ -149,50 +214,50 @@ with tab2:
         ['R','N','B','Q','K','B','N','R']
     ];
 
-    let selected = null;
-    const grid = document.getElementById('chess-grid');
-    const status = document.getElementById('status');
+    let selectState = null;
+    const cGrid = document.getElementById('c-grid');
+    const cTxt = document.getElementById('c-status');
 
-    function drawBoard() {
-        grid.innerHTML = '';
+    function renderChess() {
+        cGrid.innerHTML = '';
         for(let r=0; r<8; r++) {
             for(let c=0; c<8; c++) {
-                const cell = document.createElement('div');
-                cell.className = 'chess-cell ' + ((r+c)%2 === 1 ? 'dark' : 'light');
+                const tile = document.createElement('div');
+                tile.className = 'chess-tile ' + ((r+c)%2 === 1 ? 'dark-tile' : 'white-tile');
                 
-                if(selected && selected.r === r && selected.c === c) {
-                    cell.classList.add('selected');
+                if(selectState && selectState.r === r && selectState.c === c) {
+                    tile.classList.add('active-select');
                 }
 
-                const piece = chessBoard[r][c];
-                if(piece) {
+                const p = cBoard[r][c];
+                if(p) {
                     const img = document.createElement('img');
-                    img.src = imgs[piece];
-                    img.className = 'piece-img';
-                    cell.appendChild(img);
+                    img.src = cImgs[p];
+                    img.className = 'p-img';
+                    tile.appendChild(img);
                 }
 
-                cell.onclick = () => {
-                    if(selected === null) {
-                        if(chessBoard[r][c] !== '') {
-                            selected = {r, c};
-                            status.innerText = "말 선택됨! 이동할 칸을 누르세요.";
-                            drawBoard();
+                tile.onclick = () => {
+                    if(selectState === null) {
+                        if(cBoard[r][c] !== '') {
+                            selectState = {r, c};
+                            cTxt.innerText = "이동할 목표 칸을 누르세요.";
+                            renderChess();
                         }
                     } else {
-                        const p = chessBoard[selected.r][selected.c];
-                        chessBoard[selected.r][selected.c] = '';
-                        chessBoard[r][c] = p;
-                        selected = null;
-                        status.innerText = "";
-                        drawBoard();
+                        const targetPiece = cBoard[selectState.r][selectState.c];
+                        cBoard[selectState.r][selectState.c] = '';
+                        cBoard[r][c] = targetPiece;
+                        selectState = null;
+                        cTxt.innerText = "말을 움직였습니다.";
+                        renderChess();
                     }
                 };
-                grid.appendChild(cell);
+                cGrid.appendChild(tile);
             }
         }
     }
-    drawBoard();
+    renderChess();
     </script>
     """
-    components.html(chess_html, height=500)
+    components.html(chess_html, height=550)
