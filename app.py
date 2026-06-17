@@ -166,10 +166,10 @@ else:
         if piece in black_pieces and target in black_pieces: return False
         
         p_type = piece
-        # 1. 폰(Pawn) 규칙
+        # 1. 폰(Pawn) 규칙 (오타 수정 완료!)
         if p_type == "♙": # 백색 폰
             if dc == 0 and dr == -1 and target == " ": return True
-            if dc == 0 Arab and dr == -2 and f_r == 6 and st.session_state.c_board[5][f_c] == " " and target == " ": return True
+            if dc == 0 and dr == -2 and f_r == 6 and st.session_state.c_board[5][f_c] == " " and target == " ": return True
             if abs_dc == 1 and dr == -1 and target in black_pieces: return True
             return False
         if p_type == "♟": # 흑색 폰
@@ -182,4 +182,58 @@ else:
         if p_type in ["♖", "♜"]:
             if f_r != t_r and f_c != t_c: return False
             sr = 0 if dr == 0 else (1 if dr > 0 else -1)
-            sc = 0 if dc == 0 else (1 if dc >
+            sc = 0 if dc == 0 else (1 if dc > 0 else -1)
+            cr, cc = f_r + sr, f_c + sc
+            while cr != t_r or cc != t_c:
+                if st.session_state.c_board[cr][cc] != " ": return False
+                cr += sr; cc += sc
+            return True
+            
+        # 3. 비숍(Bishop) 규칙
+        if p_type in ["♗", "♝"]:
+            if abs_dr != abs_dc: return False
+            sr = 1 if dr > 0 else -1
+            sc = 1 if dc > 0 else -1
+            cr, cc = f_r + sr, f_c + sc
+            while cr != t_r:
+                if st.session_state.c_board[cr][cc] != " ": return False
+                cr += sr; cc += sc
+            return True
+            
+        # 4. 나이트(Knight) 규칙
+        if p_type in ["♘", "♞"]:
+            return (abs_dr == 2 and abs_dc == 1) or (abs_dr == 1 and abs_dc == 2)
+            
+        # 5. 퀸(Queen) 규칙
+        if p_type in ["♕", "♛"]:
+            if abs_dr == abs_dc or f_r == t_r or f_c == t_c:
+                sr = 0 if dr == 0 else (1 if dr > 0 else -1)
+                sc = 0 if dc == 0 else (1 if dc > 0 else -1)
+                cr, cc = f_r + sr, f_c + sc
+                while cr != t_r or cc != t_c:
+                    if st.session_state.c_board[cr][cc] != " ": return False
+                    cr += sr; cc += sc
+                return True
+            return False
+            
+        # 6. 킹(King) 규칙
+        if p_type in ["♔", "♚"]:
+            return abs_dr <= 1 and abs_dc <= 1
+            
+        return False
+
+    st.markdown('<div class="board-container">', unsafe_allow_html=True)
+    for r in range(8):
+        cols = st.columns(8)
+        for c in range(8):
+            piece = st.session_state.c_board[r][c]
+            is_dark = (r + c) % 2 == 1
+            
+            # 테마 색상 설정
+            bg_style = "#b58863" if is_dark else "#f0d9b5"
+            if st.session_state.c_select == (r, c):
+                bg_style = "#769656" # 선택된 칸은 연두색 하이라이트
+                
+            with cols[c]:
+                st.markdown(f'<div class="chess-tile"><style>button[key="c-{r}-{c}"] {{ background-color: {bg_style} !important; }}</style>', unsafe_allow_html=True)
+                if st.button(piece, key=f"c-{r}-{c}", use_container_width=True):
